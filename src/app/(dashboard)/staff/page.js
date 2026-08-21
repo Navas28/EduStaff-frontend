@@ -1,89 +1,61 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import StatusBadge from "@/components/ui/StatusBadge";
 import { Loading } from "@/components/ui/Loading";
-import CreateStaffModal from "./_components/CreateStaffModal";
+import StatusBadge from "@/components/ui/StatusBadge";
+import AddStaffWizard from "./_components/AddStaffWizard";
 import CredentialsModal from "./_components/CredentialsModal";
 
+const STAFF_TYPE_LABEL = {
+  TEACHING: "Teaching",
+  NON_TEACHING: "Non-Teaching",
+};
+
 export default function StaffPage() {
-  const [staff, setStaff] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [roles, setRoles] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [credentials, setCredentials] = useState(null);
 
-  const loadStaff = useCallback(async () => {
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const loadProfiles = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await apiFetch(`/users?status=${statusFilter}`);
-      setStaff(data);
+      const params = new URLSearchParams({ status: statusFilter });
+      if (search) params.set("search", search);
+      const { data } = await apiFetch(`/staff?${params.toString()}`);
+      setProfiles(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, search]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching staff on mount / filter change
-    loadStaff();
-  }, [loadStaff]);
+    loadProfiles();
+  }, [loadProfiles]);
 
   useEffect(() => {
     apiFetch("/roles")
       .then(({ data }) => setRoles(data))
       .catch(() => setRoles([]));
   }, []);
-
-  const handleArchive = async (id) => {
-    setError("");
-    try {
-      await apiFetch(`/users/${id}/archive`, { method: "PATCH" });
-      loadStaff();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleRestore = async (id) => {
-    setError("");
-    try {
-      await apiFetch(`/users/${id}/restore`, { method: "PATCH" });
-      loadStaff();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleResetPassword = async (id) => {
-    setError("");
-    try {
-      const { data } = await apiFetch(`/users/${id}/reset-password`, { method: "POST" });
-      setCredentials(data);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleRoleChange = async (id, roleId) => {
-    setError("");
-    try {
-      await apiFetch(`/users/${id}/role`, {
-        method: "PATCH",
-        body: JSON.stringify({ roleId: roleId || null }),
-      });
-      loadStaff();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -92,12 +64,12 @@ export default function StaffPage() {
           <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
             Staff Directory
           </p>
-          <h1 className="text-3xl font-bold tracking-tight text-ink">Staff accounts</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-ink">Staff</h1>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>Add staff account</Button>
+        <Button onClick={() => setWizardOpen(true)}>Add staff</Button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {["ACTIVE", "ARCHIVED"].map((status) => (
           <button
             key={status}
@@ -112,6 +84,13 @@ export default function StaffPage() {
             {status === "ACTIVE" ? "Active" : "Archived"}
           </button>
         ))}
+        <input
+          type="search"
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          placeholder="Search name, staff ID, or phone..."
+          className="ml-auto w-full max-w-xs rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-chalkboard"
+        />
       </div>
 
       {error ? (
@@ -125,101 +104,58 @@ export default function StaffPage() {
           <thead>
             <tr className="border-b border-border-surface">
               <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+                Staff ID
+              </th>
+              <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
                 Name
               </th>
               <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-                Email
+                Type
               </th>
               <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-                Role
+                Designation
+              </th>
+              <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
+                Subject
               </th>
               <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
                 Status
-              </th>
-              <th className="px-6 py-3 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-                Actions
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-surface">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-6">
+                <td colSpan={6} className="px-6 py-6">
                   <div className="flex justify-center">
                     <Loading />
                   </div>
                 </td>
               </tr>
-            ) : staff.length === 0 ? (
+            ) : profiles.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-6 text-center text-ink-muted">
-                  No {statusFilter === "ACTIVE" ? "active" : "archived"} staff accounts yet.
+                <td colSpan={6} className="px-6 py-6 text-center text-ink-muted">
+                  No {statusFilter === "ACTIVE" ? "active" : "archived"} staff yet.
                 </td>
               </tr>
             ) : (
-              staff.map((member) => (
-                <tr key={member._id}>
+              profiles.map((profile) => (
+                <tr key={profile._id} className="hover:bg-paper/60">
                   <td className="px-6 py-3 font-medium text-ink">
-                    {member.name}
-                    {member.isSuperAdmin ? (
-                      <span className="ml-2 text-[11px] font-medium uppercase tracking-[0.06em] text-ink-muted">
-                        Super Admin
-                      </span>
-                    ) : null}
+                    <Link href={`/staff/${profile._id}`} className="hover:underline">
+                      {profile.staffCode}
+                    </Link>
                   </td>
-                  <td className="px-6 py-3 text-ink-muted">{member.email}</td>
+                  <td className="px-6 py-3 text-ink">{profile.userId?.name}</td>
                   <td className="px-6 py-3">
-                    {member.isSuperAdmin ? (
-                      <span className="text-ink-muted">—</span>
-                    ) : (
-                      <select
-                        value={member.roleId?._id || ""}
-                        onChange={(event) => handleRoleChange(member._id, event.target.value)}
-                        disabled={member.status === "ARCHIVED"}
-                        className="rounded-md border border-border bg-paper px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-chalkboard disabled:opacity-50"
-                      >
-                        <option value="">No role</option>
-                        {roles.map((role) => (
-                          <option key={role._id} value={role._id}>
-                            {role.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                    <span className="rounded-full bg-paper px-2 py-1 text-xs font-medium text-ink-muted">
+                      {STAFF_TYPE_LABEL[profile.staffType]}
+                    </span>
                   </td>
+                  <td className="px-6 py-3 text-ink-muted">{profile.designation}</td>
+                  <td className="px-6 py-3 text-ink-muted">{profile.qualifiedSubject || "—"}</td>
                   <td className="px-6 py-3">
-                    <StatusBadge status={member.status} />
-                  </td>
-                  <td className="px-6 py-3">
-                    <div className="flex gap-3">
-                      {!member.isSuperAdmin && member.status === "ACTIVE" ? (
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(member._id)}
-                          className="text-sm font-semibold text-stamp-red hover:underline"
-                        >
-                          Archive
-                        </button>
-                      ) : null}
-                      {member.status === "ARCHIVED" ? (
-                        <button
-                          type="button"
-                          onClick={() => handleRestore(member._id)}
-                          className="text-sm font-semibold text-chalkboard hover:underline"
-                        >
-                          Restore
-                        </button>
-                      ) : null}
-                      {!member.isSuperAdmin ? (
-                        <button
-                          type="button"
-                          onClick={() => handleResetPassword(member._id)}
-                          className="text-sm font-semibold text-ink hover:underline"
-                        >
-                          Reset password
-                        </button>
-                      ) : null}
-                    </div>
+                    <StatusBadge status={profile.userId?.status} />
                   </td>
                 </tr>
               ))
@@ -228,14 +164,14 @@ export default function StaffPage() {
         </table>
       </Card>
 
-      <CreateStaffModal
-        open={createOpen}
+      <AddStaffWizard
+        open={wizardOpen}
         roles={roles}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => setWizardOpen(false)}
         onCreated={(data) => {
-          setCreateOpen(false);
+          setWizardOpen(false);
           setCredentials(data);
-          loadStaff();
+          loadProfiles();
         }}
       />
 
