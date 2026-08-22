@@ -10,6 +10,7 @@ import ProfileInfoCard from "./_components/ProfileInfoCard";
 import AccountCard from "./_components/AccountCard";
 import AllocationCard from "./_components/AllocationCard";
 import ClassTeacherCard from "./_components/ClassTeacherCard";
+import SalaryStructureCard from "./_components/SalaryStructureCard";
 import CredentialsModal from "../_components/CredentialsModal";
 
 export default function StaffDetailPage() {
@@ -104,6 +105,8 @@ export default function StaffDetailPage() {
           <ClassTeacherCard profile={profile} onUpdated={setProfile} onError={setError} />
         </>
       ) : null}
+
+      <SalaryStructureCard profile={profile} onUpdated={setProfile} onError={setError} />
 
       <CredentialsModal credentials={credentials} onClose={() => setCredentials(null)} />
     </div>

@@ -30,3 +30,22 @@ export async function apiFetch(path, options = {}) {
 
   return body;
 }
+
+export async function apiDownload(path, filename) {
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiRequestError(body?.message || "Download failed", response.status, body?.errors || []);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
